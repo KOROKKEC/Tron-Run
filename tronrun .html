@@ -1,9 +1,11 @@
+--- START OF FILE tronrun .html ---
+
 <!DOCTYPE html>
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>TRON: LIGHTCYCLE - BRAKE UPDATE</title>
+    <title>TRON: LIGHTCYCLE - UPDATE</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000510; font-family: 'Segoe UI', sans-serif; user-select: none; }
         #canvas-container { width: 100%; height: 100%; display: block; }
@@ -26,8 +28,12 @@
         #kill-count { color: #ff0055; font-size: 2.5rem; text-shadow: 0 0 15px #ff0000; }
         #speed-meter { color: #ff00cc; font-size: 1rem; letter-spacing: 2px; }
         
-        /* 底部控制区 */
-        .controls-left { position: absolute; left: 30px; bottom: 40px; pointer-events: auto; }
+        /* 底部控制区 - 修改为纵向排列 */
+        .controls-left { 
+            position: absolute; left: 30px; bottom: 40px; pointer-events: auto; 
+            display: flex; flex-direction: column; gap: 20px; align-items: center;
+        }
+        /* 右侧控制区移除或留空 */
         .controls-right { position: absolute; right: 30px; bottom: 40px; pointer-events: auto; }
 
         /* 加速按钮 (黄色) */
@@ -45,10 +51,11 @@
 
         /* 减速按钮 (青色) */
         .btn-brake {
-            width: 100px; height: 100px; border-radius: 50%; border: 2px solid #00ffff;
+            width: 80px; height: 80px; /* 稍微改小一点以区分主次 */
+            border-radius: 50%; border: 2px solid #00ffff;
             background: rgba(0, 255, 255, 0.1); color: #00ffff;
             display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem; font-weight: bold; letter-spacing: 1px;
+            font-size: 1.0rem; font-weight: bold; letter-spacing: 1px;
             box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
             transition: all 0.1s; cursor: pointer; user-select: none;
         }
@@ -95,14 +102,13 @@
             <div id="speed-meter" class="hud-item">SPD: 100%</div>
         </div>
         
+        <!-- 修改：所有按钮放在左侧，纵向排列 -->
         <div class="controls-left">
             <div id="boost-btn" class="btn-boost">BOOST</div>
-        </div>
-        
-        <!-- 新增减速按钮 -->
-        <div class="controls-right">
             <div id="brake-btn" class="btn-brake">BRAKE</div>
         </div>
+        
+        <div class="controls-right"></div>
         
         <div id="alt-meter" class="hud-alt">ALTITUDE: 0</div>
     </div>
@@ -266,17 +272,15 @@
         
         // 状态变量
         let isBoosting = false;
-        let isBraking = false; // 新增刹车状态
+        let isBraking = false; 
         let cameraFollowsPlayer = false;
 
         // 玩家Z轴位置配置
         const PLAYER_BASE_Z = 0;
-        const PLAYER_BOOST_Z = -20; // 加速时向前
-        const PLAYER_BRAKE_Z = 20;  // 刹车时向后 (躲避夹击)
+        const PLAYER_BOOST_Z = -20; 
+        const PLAYER_BRAKE_Z = 20;  
 
         const PLAYABLE_LIMIT = 35; 
-        
-        // --- 修改点：山脉距离调近至 65 ---
         const MOUNTAIN_X = 65; 
 
         // --- Assets ---
@@ -294,7 +298,9 @@
             const tex = createSunTexture();
             const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, fog: false });
             const sun = new THREE.Mesh(new THREE.CircleGeometry(90, 64), mat);
-            sun.position.set(0, 60, -900);
+            // 修改：降低太阳高度，确保能被山挡住 (原Y=60)
+            sun.position.set(0, 40, -900);
+            
             const glowMat = new THREE.MeshBasicMaterial({ color: 0xff0088, transparent: true, opacity: 0.4, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false });
             const halo = new THREE.Mesh(new THREE.CircleGeometry(150, 64), glowMat);
             halo.position.copy(sun.position); halo.position.z -= 1; 
@@ -382,13 +388,31 @@
         }
 
         function createMountainChunk() {
+            // 修改：增加山体高度，并添加黑色实体遮挡太阳
             const width = 50; const length = 100; const segW = 4; const segL = 4;
             const geo = new THREE.PlaneGeometry(width, length, segW, segL);
             const pos = geo.attributes.position;
-            for(let i=0; i<pos.count; i++) { const x = pos.getX(i); const h = Math.random() * 30; if (Math.abs(x) < 10) pos.setZ(i, 0); else pos.setZ(i, h); }
+            for(let i=0; i<pos.count; i++) { 
+                const x = pos.getX(i); 
+                // 增加高度上限到 85 (之前是30)
+                const h = Math.random() * 85; 
+                if (Math.abs(x) < 10) pos.setZ(i, 0); else pos.setZ(i, h); 
+            }
             geo.computeVertexNormals();
+            
+            // 创建线框
             const line = new THREE.LineSegments(new THREE.WireframeGeometry(geo), new THREE.LineBasicMaterial({ color: 0x004466 }));
-            line.rotation.x = -Math.PI/2; return line;
+            
+            // 创建实体黑色Mesh用于遮挡
+            const solidMat = new THREE.MeshBasicMaterial({ color: 0x000510, side: THREE.DoubleSide });
+            const solid = new THREE.Mesh(geo, solidMat);
+            
+            const group = new THREE.Group();
+            group.add(solid);
+            group.add(line);
+            group.rotation.x = -Math.PI/2; 
+            
+            return group;
         }
 
         function createRecognizer() {
@@ -527,7 +551,7 @@
 
             window.addEventListener('keydown', (e) => { 
                 if(e.code === 'Space') setBoost(true);
-                if(e.key === 'Shift') setBrake(true); // Shift for Brake
+                if(e.key === 'Shift') setBrake(true); 
                 if(e.code === 'Escape') togglePause();
             });
             window.addEventListener('keyup', (e) => { 
@@ -665,7 +689,7 @@
             // --- 速度倍率逻辑 ---
             let boostMult = 1.0;
             if(isBoosting) boostMult = 1.5;
-            else if(isBraking) boostMult = 0.5; // 刹车时减速到一半
+            else if(isBraking) boostMult = 0.5; 
             
             speed = baseMultiplier * boostMult;
             
@@ -675,16 +699,23 @@
             player.position.x += (targetX - player.position.x) * 0.12;
             player.position.x = Math.max(Math.min(player.position.x, PLAYABLE_LIMIT), -PLAYABLE_LIMIT);
 
-            // --- Z轴位置逻辑 (刹车后退躲避) ---
+            // --- Z轴位置逻辑 ---
             let targetZ = PLAYER_BASE_Z;
             if (isBoosting) targetZ = PLAYER_BOOST_Z;
-            else if (isBraking) targetZ = PLAYER_BRAKE_Z; // 后退
+            else if (isBraking) targetZ = PLAYER_BRAKE_Z; 
 
             player.position.z += (targetZ - player.position.z) * 0.1;
 
             player.rotation.z = (player.position.x - targetX) * 0.08;
             player.rotation.z = Math.max(Math.min(player.rotation.z, 0.5), -0.5);
             
+            // --- 摄像机跟随逻辑修改 ---
+            // 基础目标Z位置: 保持摄像机在玩家后方 ~14 单位
+            const desiredCamZ = player.position.z + 14;
+            
+            // 平滑移动摄像机Z轴 (解决刹车时玩家超出屏幕问题)
+            camera.position.z += (desiredCamZ - camera.position.z) * 0.1;
+
             if (cameraFollowsPlayer) {
                 camera.position.x += (player.position.x - camera.position.x) * 0.1;
                 camera.lookAt(camera.position.x, player.position.y * 0.3, -30);
